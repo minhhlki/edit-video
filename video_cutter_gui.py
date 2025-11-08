@@ -42,9 +42,9 @@ class VideoCutterGUI:
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
 
-        # Set window size to 80% of screen, max 900x800
-        window_width = min(900, int(screen_width * 0.8))
-        window_height = min(800, int(screen_height * 0.85))
+        # Set window size to 80% of screen, max 1000x700 (optimized)
+        window_width = min(1000, int(screen_width * 0.8))
+        window_height = min(700, int(screen_height * 0.8))
 
         # Center window
         x = (screen_width - window_width) // 2
@@ -54,7 +54,7 @@ class VideoCutterGUI:
         self.root.resizable(True, True)
 
         # Set minimum size
-        self.root.minsize(750, 600)
+        self.root.minsize(900, 650)
 
         # Variables
         self.input_video_path = tk.StringVar()
@@ -88,236 +88,147 @@ class VideoCutterGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
-        # Create main container with canvas and scrollbar
-        container = ttk.Frame(self.root)
-        container.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        container.columnconfigure(0, weight=1)
-        container.rowconfigure(0, weight=1)
+        # Create main container (no scrollbar - all fits in one screen)
+        main_frame = ttk.Frame(self.root, padding="8")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-        # Create canvas
-        self.canvas = tk.Canvas(container, highlightthickness=0)
-        self.canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-
-        # Create scrollbar
-        scrollbar = ttk.Scrollbar(container, orient=tk.VERTICAL, command=self.canvas.yview)
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Create frame inside canvas
-        main_frame = ttk.Frame(self.canvas, padding="10")
-        self.canvas_frame = self.canvas.create_window((0, 0), window=main_frame, anchor=tk.NW)
-
-        # Configure main_frame
+        # Configure main_frame columns
+        main_frame.columnconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
-
-        # Bind events for scrolling
-        def _on_frame_configure(event):
-            """Reset scroll region when frame size changes"""
-            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-        def _on_canvas_configure(event):
-            """Resize frame to match canvas width"""
-            canvas_width = event.width
-            self.canvas.itemconfig(self.canvas_frame, width=canvas_width)
-
-        def _on_mousewheel(event):
-            """Scroll with mousewheel"""
-            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-        def _on_enter(event):
-            """Bind mousewheel when mouse enters"""
-            if sys.platform == "win32":
-                self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
-            else:
-                self.canvas.bind_all("<Button-4>", lambda e: self.canvas.yview_scroll(-1, "units"))
-                self.canvas.bind_all("<Button-5>", lambda e: self.canvas.yview_scroll(1, "units"))
-
-        def _on_leave(event):
-            """Unbind mousewheel when mouse leaves"""
-            if sys.platform == "win32":
-                self.canvas.unbind_all("<MouseWheel>")
-            else:
-                self.canvas.unbind_all("<Button-4>")
-                self.canvas.unbind_all("<Button-5>")
-
-        main_frame.bind("<Configure>", _on_frame_configure)
-        self.canvas.bind("<Configure>", _on_canvas_configure)
-        self.canvas.bind("<Enter>", _on_enter)
-        self.canvas.bind("<Leave>", _on_leave)
 
         # ===== HEADER =====
         header_frame = ttk.Frame(main_frame)
-        header_frame.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        header_frame.grid(row=0, column=0, columnspan=2, pady=(0, 8))
 
         title_label = ttk.Label(
             header_frame,
-            text="🎬 VIDEO CUTTER TOOL",
-            font=("Arial", 18, "bold")
+            text="🎬 VIDEO CUTTER TOOL - Công cụ cắt và ghép video",
+            font=("Arial", 12, "bold")
         )
         title_label.pack()
-
-        subtitle_label = ttk.Label(
-            header_frame,
-            text="Công cụ cắt và ghép video - Video Cutting & Concatenation Tool",
-            font=("Arial", 10)
-        )
-        subtitle_label.pack()
 
         row = 1
 
         # ===== YOUTUBE DOWNLOAD =====
         if YOUTUBE_AVAILABLE:
-            youtube_frame = ttk.LabelFrame(main_frame, text="📥 Tải video từ YouTube (Tùy chọn)", padding="10")
-            youtube_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+            youtube_frame = ttk.LabelFrame(main_frame, text="📥 YouTube (Tùy chọn)", padding="5")
+            youtube_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
             youtube_frame.columnconfigure(0, weight=1)
 
-            # YouTube URL input
-            url_frame = ttk.Frame(youtube_frame)
-            url_frame.pack(fill=tk.X, pady=(0, 5))
-            url_frame.columnconfigure(0, weight=1)
-
-            ttk.Label(url_frame, text="🔗 YouTube URL:").grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
-
-            url_entry_frame = ttk.Frame(url_frame)
-            url_entry_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
+            # YouTube URL input in one line
+            url_entry_frame = ttk.Frame(youtube_frame)
+            url_entry_frame.pack(fill=tk.X)
             url_entry_frame.columnconfigure(0, weight=1)
 
             self.youtube_url_entry = ttk.Entry(url_entry_frame, textvariable=self.youtube_url)
-            self.youtube_url_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
+            self.youtube_url_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
 
-            self.download_btn = ttk.Button(url_entry_frame, text="⬇️ Tải xuống", command=self.start_youtube_download)
+            self.download_btn = ttk.Button(url_entry_frame, text="⬇️ Tải", command=self.start_youtube_download)
             self.download_btn.grid(row=0, column=1)
 
             # YouTube download status
-            self.youtube_status = tk.StringVar(value="Nhập URL YouTube và nhấn Tải xuống")
+            self.youtube_status = tk.StringVar(value="")
             youtube_status_label = ttk.Label(youtube_frame, textvariable=self.youtube_status, font=("Arial", 8), foreground="gray")
-            youtube_status_label.pack(anchor=tk.W, pady=(5, 0))
+            youtube_status_label.pack(anchor=tk.W, pady=(2, 0))
 
             row += 1
 
         # ===== INPUT VIDEO =====
-        ttk.Label(main_frame, text="📹 Video đầu vào:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, sticky=tk.W, pady=(10, 5)
+        ttk.Label(main_frame, text="📹 Video đầu vào:", font=("Arial", 9, "bold")).grid(
+            row=row, column=0, sticky=tk.W, pady=(5, 2)
         )
 
         input_frame = ttk.Frame(main_frame)
-        input_frame.grid(row=row+1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        input_frame.grid(row=row+1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
         input_frame.columnconfigure(0, weight=1)
 
         self.input_entry = ttk.Entry(input_frame, textvariable=self.input_video_path, state="readonly")
-        self.input_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
+        self.input_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
 
         browse_input_btn = ttk.Button(input_frame, text="Chọn Video", command=self.browse_input_video)
         browse_input_btn.grid(row=0, column=1)
 
         # ===== SEGMENTS INPUT =====
         row += 2
-        ttk.Label(main_frame, text="✂️ Đoạn cần cắt:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, sticky=tk.W, pady=(10, 5)
+        ttk.Label(main_frame, text="✂️ Đoạn cần cắt (VD: 03:05-03:10|40:05-40:10):", font=("Arial", 9, "bold")).grid(
+            row=row, column=0, columnspan=2, sticky=tk.W, pady=(5, 2)
         )
-
-        # Info label
-        info_label = ttk.Label(
-            main_frame,
-            text="Định dạng: start1-end1|start2-end2|start3-end3 (Ví dụ: 03:05-03:10|40:05-40:10|1:03:05-1:04:05)",
-            font=("Arial", 8),
-            foreground="gray"
-        )
-        info_label.grid(row=row, column=1, columnspan=2, sticky=tk.W, pady=(10, 5))
 
         # Segments text area
         row += 1
         self.segments_entry = scrolledtext.ScrolledText(
             main_frame,
-            height=4,
+            height=2,
             width=60,
-            font=("Consolas", 10),
+            font=("Consolas", 9),
             wrap=tk.WORD
         )
-        self.segments_entry.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 5))
+        self.segments_entry.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 3))
 
-        # Example button
-        example_btn = ttk.Button(
-            main_frame,
-            text="📝 Dán ví dụ mẫu",
-            command=self.insert_example
-        )
-        example_btn.grid(row=row+1, column=0, sticky=tk.W, pady=(0, 10))
+        # Buttons in one line
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.grid(row=row+1, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
 
-        # Validate button
-        validate_btn = ttk.Button(
-            main_frame,
-            text="✓ Kiểm tra định dạng",
-            command=self.validate_segments
-        )
-        validate_btn.grid(row=row+1, column=1, sticky=tk.W, pady=(0, 10), padx=(10, 0))
+        example_btn = ttk.Button(btn_frame, text="📝 Ví dụ", command=self.insert_example)
+        example_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        validate_btn = ttk.Button(btn_frame, text="✓ Kiểm tra", command=self.validate_segments)
+        validate_btn.pack(side=tk.LEFT)
 
         # ===== OUTPUT VIDEO =====
         row += 2
-        ttk.Label(main_frame, text="💾 Video đầu ra:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, sticky=tk.W, pady=(10, 5)
+        ttk.Label(main_frame, text="💾 Video đầu ra:", font=("Arial", 9, "bold")).grid(
+            row=row, column=0, sticky=tk.W, pady=(5, 2)
         )
 
         output_frame = ttk.Frame(main_frame)
-        output_frame.grid(row=row+1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        output_frame.grid(row=row+1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
         output_frame.columnconfigure(0, weight=1)
 
         self.output_entry = ttk.Entry(output_frame, textvariable=self.output_video_path)
-        self.output_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
+        self.output_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
 
         browse_output_btn = ttk.Button(output_frame, text="Chọn nơi lưu", command=self.browse_output_video)
         browse_output_btn.grid(row=0, column=1)
 
-        # ===== PROCESSING MODE =====
+        # ===== PROCESSING MODE & VOLUME (Side by side) =====
         row += 2
-        ttk.Label(main_frame, text="⚙️ Chế độ xử lý:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, sticky=tk.W, pady=(10, 5)
-        )
 
-        mode_frame = ttk.LabelFrame(main_frame, text="Chọn chế độ tốc độ", padding="10")
-        mode_frame.grid(row=row+1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        # Left column: Processing Mode
+        mode_frame = ttk.LabelFrame(main_frame, text="⚙️ Chế độ xử lý", padding="5")
+        mode_frame.grid(row=row, column=0, sticky=(tk.W, tk.E, tk.N), pady=(0, 5), padx=(0, 3))
 
         # Radio buttons for mode selection
         ttk.Radiobutton(
             mode_frame,
-            text="🚀 Fast - Rất nhanh (có thể sai lệch 1-2s, dùng khi không cần chính xác tuyệt đối)",
+            text="🚀 Fast (nhanh, ±1-2s)",
             variable=self.processing_mode,
             value="fast"
-        ).pack(anchor=tk.W, pady=2)
+        ).pack(anchor=tk.W, pady=1)
 
         ttk.Radiobutton(
             mode_frame,
-            text="⚡ Balanced - Cân bằng (nhanh + chính xác, KHUYẾN NGHỊ)",
+            text="⚡ Balanced (khuyến nghị)",
             variable=self.processing_mode,
             value="balanced"
-        ).pack(anchor=tk.W, pady=2)
+        ).pack(anchor=tk.W, pady=1)
 
         ttk.Radiobutton(
             mode_frame,
-            text="🎯 Accurate - Chính xác tuyệt đối (chậm nhất, cho video quan trọng)",
+            text="🎯 Accurate (chính xác 100%)",
             variable=self.processing_mode,
             value="accurate"
-        ).pack(anchor=tk.W, pady=2)
+        ).pack(anchor=tk.W, pady=1)
 
-        # Mode explanation
-        mode_explain = ttk.Label(
-            mode_frame,
-            text="💡 Mẹo: Dùng Fast để kiểm tra nhanh, Balanced cho hầu hết trường hợp, Accurate cho video quan trọng",
-            font=("Arial", 8),
-            foreground="gray"
-        )
-        mode_explain.pack(anchor=tk.W, pady=(5, 0))
-
-        # ===== VOLUME CONTROL =====
-        row += 2
-        volume_frame = ttk.LabelFrame(main_frame, text="🔊 Điều chỉnh âm lượng", padding="10")
-        volume_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 10))
+        # Right column: Volume Control
+        volume_frame = ttk.LabelFrame(main_frame, text="🔊 Âm lượng", padding="5")
+        volume_frame.grid(row=row, column=1, sticky=(tk.W, tk.E, tk.N), pady=(0, 5), padx=(3, 0))
 
         volume_info_frame = ttk.Frame(volume_frame)
-        volume_info_frame.pack(fill=tk.X, pady=(0, 5))
+        volume_info_frame.pack(fill=tk.X, pady=(0, 3))
 
-        ttk.Label(volume_info_frame, text="0% = Tắt | 100% = Giữ nguyên | 200% = Tăng 2x").pack(side=tk.LEFT)
-        self.volume_label = ttk.Label(volume_info_frame, text="100%", font=("Arial", 10, "bold"))
+        ttk.Label(volume_info_frame, text="0%=Tắt | 100%=Giữ nguyên", font=("Arial", 8)).pack(side=tk.LEFT)
+        self.volume_label = ttk.Label(volume_info_frame, text="100%", font=("Arial", 9, "bold"))
         self.volume_label.pack(side=tk.RIGHT)
 
         volume_slider = ttk.Scale(
@@ -328,75 +239,71 @@ class VideoCutterGUI:
             variable=self.volume,
             command=self.update_volume_label
         )
-        volume_slider.pack(fill=tk.X, pady=(0, 5))
+        volume_slider.pack(fill=tk.X, pady=(0, 3))
 
         # Preset buttons
         preset_frame = ttk.Frame(volume_frame)
         preset_frame.pack(fill=tk.X)
 
-        ttk.Button(preset_frame, text="Tắt (0%)", command=lambda: self.set_volume(0)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(preset_frame, text="50%", command=lambda: self.set_volume(50)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(preset_frame, text="100%", command=lambda: self.set_volume(100)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(preset_frame, text="150%", command=lambda: self.set_volume(150)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(preset_frame, text="200%", command=lambda: self.set_volume(200)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(preset_frame, text="0%", command=lambda: self.set_volume(0), width=5).pack(side=tk.LEFT, padx=1)
+        ttk.Button(preset_frame, text="50%", command=lambda: self.set_volume(50), width=5).pack(side=tk.LEFT, padx=1)
+        ttk.Button(preset_frame, text="100%", command=lambda: self.set_volume(100), width=5).pack(side=tk.LEFT, padx=1)
+        ttk.Button(preset_frame, text="200%", command=lambda: self.set_volume(200), width=5).pack(side=tk.LEFT, padx=1)
 
         # ===== PREVIEW INFO =====
         row += 1
-        ttk.Label(main_frame, text="📊 Thông tin:", font=("Arial", 10, "bold")).grid(
-            row=row, column=0, sticky=tk.W, pady=(10, 5)
+        ttk.Label(main_frame, text="📊 Thông tin:", font=("Arial", 9, "bold")).grid(
+            row=row, column=0, sticky=tk.W, pady=(5, 2)
         )
 
         # Info text area
         row += 1
         self.info_text = scrolledtext.ScrolledText(
             main_frame,
-            height=8,
+            height=4,
             width=60,
-            font=("Consolas", 9),
+            font=("Consolas", 8),
             wrap=tk.WORD,
             state="disabled"
         )
-        self.info_text.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.info_text.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
 
         # ===== RCLONE UPLOAD =====
         row += 1
-        rclone_frame = ttk.LabelFrame(main_frame, text="📤 Upload lên Google Drive (Rclone)", padding="10")
-        rclone_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 10))
+        rclone_frame = ttk.LabelFrame(main_frame, text="📤 Google Drive (Rclone)", padding="5")
+        rclone_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
         rclone_frame.columnconfigure(0, weight=1)
 
-        # Status label
-        self.rclone_status = tk.StringVar(value="⚠️ Chưa cấu hình rclone" if not self.rclone_config_content else "✅ Đã cấu hình rclone")
-        status_label = ttk.Label(rclone_frame, textvariable=self.rclone_status, font=("Arial", 9))
-        status_label.grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
+        # Status and config button in one line
+        status_frame = ttk.Frame(rclone_frame)
+        status_frame.pack(fill=tk.X, pady=(0, 3))
+        status_frame.columnconfigure(0, weight=1)
 
-        # Config button
+        self.rclone_status = tk.StringVar(value="⚠️ Chưa cấu hình" if not self.rclone_config_content else "✅ Đã cấu hình")
+        status_label = ttk.Label(status_frame, textvariable=self.rclone_status, font=("Arial", 8))
+        status_label.grid(row=0, column=0, sticky=tk.W)
+
         self.config_btn = ttk.Button(
-            rclone_frame,
-            text="⚙️ Cấu hình rclone" if not self.rclone_config_content else "✏️ Chỉnh sửa cấu hình",
-            command=self.show_rclone_config_dialog
+            status_frame,
+            text="⚙️ Cấu hình" if not self.rclone_config_content else "✏️ Sửa",
+            command=self.show_rclone_config_dialog,
+            width=10
         )
-        self.config_btn.grid(row=0, column=1, sticky=tk.E, pady=(0, 5))
+        self.config_btn.grid(row=0, column=1, sticky=tk.E)
 
-        # Remote path
+        # Remote path in one line
         path_frame = ttk.Frame(rclone_frame)
-        path_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
+        path_frame.pack(fill=tk.X)
         path_frame.columnconfigure(1, weight=1)
 
-        ttk.Label(path_frame, text="📁 Thư mục trên Drive:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
-        remote_entry = ttk.Entry(path_frame, textvariable=self.remote_path)
+        ttk.Label(path_frame, text="📁 Thư mục:", font=("Arial", 8)).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        remote_entry = ttk.Entry(path_frame, textvariable=self.remote_path, font=("Arial", 8))
         remote_entry.grid(row=0, column=1, sticky=(tk.W, tk.E))
-
-        ttk.Label(
-            rclone_frame,
-            text="💡 Để trống = thư mục gốc",
-            font=("Arial", 8),
-            foreground="gray"
-        ).grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(2, 0))
 
         # ===== PROGRESS BAR =====
         row += 1
-        self.progress_label = ttk.Label(main_frame, text="Sẵn sàng", font=("Arial", 9))
-        self.progress_label.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+        self.progress_label = ttk.Label(main_frame, text="Sẵn sàng", font=("Arial", 8))
+        self.progress_label.grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=(5, 2))
 
         row += 1
         self.progress_bar = ttk.Progressbar(
@@ -404,12 +311,12 @@ class VideoCutterGUI:
             mode='indeterminate',
             length=400
         )
-        self.progress_bar.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
+        self.progress_bar.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
 
         # ===== ACTION BUTTONS =====
         row += 1
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=row, column=0, columnspan=3, pady=(10, 0))
+        button_frame.grid(row=row, column=0, columnspan=2, pady=(5, 0))
 
         self.process_btn = ttk.Button(
             button_frame,
@@ -417,15 +324,15 @@ class VideoCutterGUI:
             command=self.start_processing,
             style="Accent.TButton"
         )
-        self.process_btn.pack(side=tk.LEFT, padx=5)
+        self.process_btn.pack(side=tk.LEFT, padx=3)
 
         self.process_upload_btn = ttk.Button(
             button_frame,
-            text="📤 CẮT VÀ UPLOAD LÊN DRIVE",
+            text="📤 CẮT & UPLOAD",
             command=self.start_processing_with_upload,
             style="Accent.TButton"
         )
-        self.process_upload_btn.pack(side=tk.LEFT, padx=5)
+        self.process_upload_btn.pack(side=tk.LEFT, padx=3)
 
         self.cancel_btn = ttk.Button(
             button_frame,
@@ -433,27 +340,23 @@ class VideoCutterGUI:
             command=self.cancel_processing,
             state="disabled"
         )
-        self.cancel_btn.pack(side=tk.LEFT, padx=5)
+        self.cancel_btn.pack(side=tk.LEFT, padx=3)
 
         clear_btn = ttk.Button(
             button_frame,
-            text="🗑️ Xóa tất cả",
+            text="🗑️ Xóa",
             command=self.clear_all
         )
-        clear_btn.pack(side=tk.LEFT, padx=5)
+        clear_btn.pack(side=tk.LEFT, padx=3)
 
         # Configure style for accent button
         style = ttk.Style()
-        style.configure("Accent.TButton", font=("Arial", 10, "bold"))
+        style.configure("Accent.TButton", font=("Arial", 9, "bold"))
 
         # Initial info message
-        self.update_info_text("✨ Chào mừng đến với Video Cutter Tool!\n\n"
-                             "📝 Hướng dẫn sử dụng:\n"
-                             "1. Chọn video đầu vào\n"
-                             "2. Nhập các đoạn cần cắt (hoặc dùng ví dụ mẫu)\n"
-                             "3. Chọn nơi lưu video đầu ra\n"
-                             "4. Nhấn 'Bắt đầu cắt video'\n\n"
-                             "💡 Mẹo: Nhấn 'Kiểm tra định dạng' để xem trước kết quả!")
+        self.update_info_text("✨ Sẵn sàng cắt video!\n"
+                             "1. Chọn video → 2. Nhập đoạn cắt → 3. Chọn nơi lưu → 4. Bắt đầu\n"
+                             "💡 Nhấn 'Kiểm tra' để xem trước | Dùng 'Ví dụ' nếu chưa rõ định dạng")
 
     def check_ffmpeg_installed(self):
         """Kiểm tra xem ffmpeg đã được cài đặt chưa"""
@@ -581,8 +484,8 @@ class VideoCutterGUI:
             with open(self.rclone_config_file, 'w') as f:
                 f.write(content)
             self.rclone_config_content = content
-            self.rclone_status.set("✅ Đã cấu hình rclone")
-            self.config_btn.config(text="✏️ Chỉnh sửa cấu hình")
+            self.rclone_status.set("✅ Đã cấu hình")
+            self.config_btn.config(text="✏️ Sửa")
             return True
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể lưu cấu hình:\n{e}")
