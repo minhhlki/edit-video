@@ -62,6 +62,8 @@ class VideoCutterGUI:
         self.segments_text = tk.StringVar()
         self.processing_mode = tk.StringVar(value="balanced")  # Default: balanced
         self.volume = tk.IntVar(value=100)  # Default: 100% (original volume)
+        self.audio_file_path = tk.StringVar()  # Audio file to add
+        self.audio_volume = tk.IntVar(value=100)  # Audio volume (0-200%)
         self.is_processing = False
 
         # YouTube downloader variables
@@ -191,8 +193,53 @@ class VideoCutterGUI:
         browse_output_btn = ttk.Button(output_frame, text="Chọn nơi lưu", command=self.browse_output_video)
         browse_output_btn.grid(row=0, column=1)
 
-        # ===== PROCESSING MODE & VOLUME (Side by side) =====
+        # ===== AUDIO FILE (Optional) =====
         row += 2
+        audio_frame = ttk.LabelFrame(main_frame, text="🎵 Âm thanh thêm vào (Tùy chọn)", padding="5")
+        audio_frame.grid(row=row, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
+        audio_frame.columnconfigure(0, weight=1)
+
+        # Audio file selection in one line
+        audio_file_frame = ttk.Frame(audio_frame)
+        audio_file_frame.pack(fill=tk.X, pady=(0, 3))
+        audio_file_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(audio_file_frame, text="📁 File:", font=("Arial", 8)).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.audio_entry = ttk.Entry(audio_file_frame, textvariable=self.audio_file_path, font=("Arial", 8))
+        self.audio_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 5))
+
+        browse_audio_btn = ttk.Button(audio_file_frame, text="Chọn", command=self.browse_audio_file, width=8)
+        browse_audio_btn.grid(row=0, column=2)
+
+        # Audio volume control
+        audio_vol_frame = ttk.Frame(audio_frame)
+        audio_vol_frame.pack(fill=tk.X)
+
+        ttk.Label(audio_vol_frame, text="🔊 Âm lượng audio:", font=("Arial", 8)).pack(side=tk.LEFT, padx=(0, 5))
+        self.audio_volume_label = ttk.Label(audio_vol_frame, text="100%", font=("Arial", 8, "bold"))
+        self.audio_volume_label.pack(side=tk.RIGHT)
+
+        audio_slider = ttk.Scale(
+            audio_frame,
+            from_=0,
+            to=200,
+            orient=tk.HORIZONTAL,
+            variable=self.audio_volume,
+            command=self.update_audio_volume_label
+        )
+        audio_slider.pack(fill=tk.X, pady=(3, 3))
+
+        # Audio preset buttons
+        audio_preset_frame = ttk.Frame(audio_frame)
+        audio_preset_frame.pack(fill=tk.X)
+
+        ttk.Button(audio_preset_frame, text="0%", command=lambda: self.set_audio_volume(0), width=5).pack(side=tk.LEFT, padx=1)
+        ttk.Button(audio_preset_frame, text="50%", command=lambda: self.set_audio_volume(50), width=5).pack(side=tk.LEFT, padx=1)
+        ttk.Button(audio_preset_frame, text="100%", command=lambda: self.set_audio_volume(100), width=5).pack(side=tk.LEFT, padx=1)
+        ttk.Button(audio_preset_frame, text="150%", command=lambda: self.set_audio_volume(150), width=5).pack(side=tk.LEFT, padx=1)
+
+        # ===== PROCESSING MODE & VOLUME (Side by side) =====
+        row += 1
 
         # Left column: Processing Mode
         mode_frame = ttk.LabelFrame(main_frame, text="⚙️ Chế độ xử lý", padding="5")
@@ -452,6 +499,7 @@ class VideoCutterGUI:
             self.input_video_path.set("")
             self.output_video_path.set("")
             self.segments_entry.delete("1.0", tk.END)
+            self.audio_file_path.set("")
             self.update_info_text("Đã xóa tất cả. Sẵn sàng bắt đầu mới!")
 
     # ===== VOLUME CONTROL METHODS =====
@@ -465,6 +513,97 @@ class VideoCutterGUI:
         """Set volume to specific value"""
         self.volume.set(value)
         self.volume_label.config(text=f"{value}%")
+
+    # ===== AUDIO METHODS =====
+
+    def browse_audio_file(self):
+        """Chọn file audio"""
+        filename = filedialog.askopenfilename(
+            title="Chọn file audio",
+            filetypes=[
+                ("Audio files", "*.mp3 *.wav *.aac *.m4a *.flac *.ogg *.wma"),
+                ("All files", "*.*")
+            ]
+        )
+        if filename:
+            self.audio_file_path.set(filename)
+
+    def update_audio_volume_label(self, value):
+        """Update audio volume label when slider changes"""
+        vol = int(float(value))
+        self.audio_volume_label.config(text=f"{vol}%")
+
+    def set_audio_volume(self, value):
+        """Set audio volume to specific value"""
+        self.audio_volume.set(value)
+        self.audio_volume_label.config(text=f"{value}%")
+
+    def add_audio_to_video(self, video_path, audio_path, audio_volume, output_path):
+        """Thêm audio vào video với điều chỉnh âm lượng"""
+        try:
+            # Calculate audio volume filter
+            # volume=1.0 = 100%, volume=0.5 = 50%, volume=2.0 = 200%
+            volume_filter = audio_volume / 100.0
+
+            # Build ffmpeg command
+            # -i video_path: input video
+            # -i audio_path: input audio
+            # -filter_complex: mix audio from video (if any) with new audio
+            # -c:v copy: copy video codec (no re-encoding)
+            # -shortest: match shortest stream duration
+            cmd = [
+                'ffmpeg',
+                '-i', video_path,
+                '-i', audio_path,
+                '-filter_complex',
+                f'[1:a]volume={volume_filter}[a1];[0:a][a1]amix=inputs=2:duration=first[aout]',
+                '-map', '0:v',
+                '-map', '[aout]',
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                '-b:a', '192k',
+                '-shortest',
+                '-y',  # Overwrite output
+                output_path
+            ]
+
+            # Run command
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            if result.returncode != 0:
+                # If video has no audio, use simpler command
+                cmd_no_video_audio = [
+                    'ffmpeg',
+                    '-i', video_path,
+                    '-i', audio_path,
+                    '-filter:a', f'volume={volume_filter}',
+                    '-map', '0:v',
+                    '-map', '1:a',
+                    '-c:v', 'copy',
+                    '-c:a', 'aac',
+                    '-b:a', '192k',
+                    '-shortest',
+                    '-y',
+                    output_path
+                ]
+
+                result = subprocess.run(
+                    cmd_no_video_audio,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+
+                if result.returncode != 0:
+                    raise Exception(f"ffmpeg error: {result.stderr}")
+
+        except Exception as e:
+            raise Exception(f"Không thể thêm audio: {str(e)}")
 
     # ===== RCLONE METHODS =====
 
@@ -629,6 +768,13 @@ team_drive = """
         # Get processing mode and volume
         mode = self.processing_mode.get()
         volume = self.volume.get()
+        audio_file = self.audio_file_path.get()
+        audio_volume = self.audio_volume.get()
+
+        # Validate audio file if provided
+        if audio_file and not os.path.exists(audio_file):
+            messagebox.showerror("Lỗi", f"Không tìm thấy file audio:\n{audio_file}")
+            return
 
         # Start processing in background thread
         self.is_processing = True
@@ -643,18 +789,19 @@ team_drive = """
             'accurate': '🎯 ACCURATE MODE'
         }
         volume_status = f"🔊 {volume}%"
+        audio_status = f" + 🎵 {audio_volume}%" if audio_file else ""
         upload_status = " → 📤 Upload" if upload_to_drive else ""
-        self.progress_label.config(text=f"⏳ Đang xử lý ({mode_names.get(mode, mode)} - {volume_status}{upload_status})...")
+        self.progress_label.config(text=f"⏳ Đang xử lý ({mode_names.get(mode, mode)} - {volume_status}{audio_status}{upload_status})...")
 
         # Run in thread
         thread = threading.Thread(
             target=self.process_video,
-            args=(input_path, segments, output_path, mode, volume, upload_to_drive),
+            args=(input_path, segments, output_path, mode, volume, audio_file, audio_volume, upload_to_drive),
             daemon=True
         )
         thread.start()
 
-    def process_video(self, input_path, segments, output_path, mode, volume, upload_to_drive):
+    def process_video(self, input_path, segments, output_path, mode, volume, audio_file, audio_volume, upload_to_drive):
         """Xử lý video (chạy trong thread riêng)"""
         try:
             # Progress callback để cập nhật UI
@@ -662,17 +809,36 @@ team_drive = """
                 if self.is_processing:  # Chỉ update nếu chưa bị hủy
                     self.update_progress(message)
 
+            # Nếu có audio file, tạo output tạm thời
+            temp_output = None
+            if audio_file:
+                from pathlib import Path
+                output_path_obj = Path(output_path)
+                temp_output = str(output_path_obj.parent / f"{output_path_obj.stem}_temp{output_path_obj.suffix}")
+                final_output = output_path
+                current_output = temp_output
+            else:
+                current_output = output_path
+
             # Sử dụng hàm cut_video_segments đã được tối ưu
             cut_video_segments(
                 input_video=input_path,
                 segments=segments,
-                output_video=output_path,
+                output_video=current_output,
                 temp_dir="temp_segments_gui",
                 mode=mode,
                 max_workers=None,  # Auto-detect
                 volume=volume,
                 progress_callback=progress_callback
             )
+
+            # Add audio if provided
+            if audio_file and self.is_processing:
+                self.update_progress("🎵 Đang thêm audio vào video...")
+                self.add_audio_to_video(temp_output, audio_file, audio_volume, output_path)
+                # Xóa file tạm
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
 
             # Upload to Drive if requested
             if upload_to_drive and self.rclone_config_content:
